@@ -7,6 +7,37 @@ verbalizeIt =
   dataContainer:
     tasks: []
 
+  templates:
+    languageChoice: (languageOptions)->
+      "This video is in:
+      <br>
+      <select id=\"verbalizeIt-choose-from-language\">" +
+         languageOptions +
+      "</select>
+      <br>
+      <br>
+      Captions should be in:
+      <br>
+      <select id=\"verbalizeIt-choose-to-language\">" +
+        languageOptions +
+      "</select>
+      <br>
+      <br>
+      <div class=\"btn signin-submit\" id=\"verbalizeit-choose-language\">Continue</div>"
+
+    reviewOrder: (job)->
+      if job.fromLanguage is job.toLanguage
+        action = "Generating #{job.toLanguage} subtitles for this video"
+      else
+        action = "Translating this video from #{job.fromLanguage} to #{job.toLanguage}"
+
+      action + " will cost $#{job.cost}. " +
+        " Would you like to proceed? <div class=\"btn signin-submit\" " +
+        "id=\"verbalizeit-submit-task\">Accept</div>"
+
+    submitted: (job)->
+      "Success! Your request will be processed within 24 hours."
+
   loginViewToggler:
     uploadCaptionInput: ->
       $("#upload-caption-radio")
@@ -28,15 +59,17 @@ verbalizeIt =
         @verbalizeItCaptionForm().removeClass("hide")
         @uploadCaptionForm().addClass("hide")
 
-  bindUploadToggles: ->
-    $('input[name=caption-option]').change =>
-      @loginViewToggler.toggleUploadOptions()
-
   loginHandler:
-    loginProcess: ->
+    getInfo: (action)->
       email = $("#verbalizeit-email").val()
       password = $("#verbalizeit-password").val()
-      @login(email, password)
+      action(email, password)
+
+    loginProcess: ->
+      @getInfo(@login)
+
+    signupProcess: ->
+      @getInfo(@signup)
 
     login: (email, password)->
       $.post "https://stagingapi.verbalizeit.com/api/customers/login",
@@ -46,22 +79,21 @@ verbalizeIt =
           verbalizeIt.languageHandler.displayLanguages()
           verbalizeIt.languageHandler.enableSubmitButton()
 
+    signup: (email, password)->
+      $.post "https://stagingapi.verbalizeit.com/api/customers/register",
+        {customer: {email: email, password: password}}, (response)=>
+          customer = response.customer
+          verbalizeIt.dataContainer.authToken = customer.auth_token
+          verbalizeIt.languageHandler.displayLanguages()
+          verbalizeIt.languageHandler.enableSubmitButton()      
+
   languageHandler:
     displayLanguages: ->
       $.get "https://stagingapi.verbalizeit.com/api/languages", (response)=>
         languageOptions = @parseAsOptions(response.languages)
 
         $("#verbalizeit-caption-form").html(
-          "This video is in:" +
-          "<br><select id=\"verbalizeIt-choose-from-language\">" +
-          @parseAsOptions(response.languages) +
-          "</select><br><br>" +
-          "Captions should be in:" +
-          "<br><select id=\"verbalizeIt-choose-to-language\">" +
-          @parseAsOptions(response.languages) +
-          "</select><br><br>" +
-          "<div class=\"btn signin-submit\" id=\"verbalizeit-choose-language\">" +
-          "Continue</div>")
+          verbalizeIt.templates.languageChoice(languageOptions))
 
     parseAsOptions: (languages)->
       $.map(languages, (language,index)->
@@ -97,26 +129,29 @@ verbalizeIt =
 
   jobHandler:
     displayJob: (job)->
-      console.log(job)
-      if job.fromLanguage is job.toLanguage
-        action = "Generating #{job.toLanguage} subtitles for this video"
-      else
-        action = "Translating this video from #{job.fromLanguage} to #{job.toLanguage}"
-      
-      $("#verbalizeit-caption-form").html action + " will cost $#{job.cost}. " +
-        " Would you like to proceed? <div class=\"btn signin-submit\" " +
-        "id=\"verbalizeit-submit-task\">Accept</div>"
+      $("#verbalizeit-caption-form").html(
+        verbalizeIt.templates.reviewOrder(job))
       
       $("#verbalizeit-caption-form").on 'click', "#verbalizeit-submit-task", ->
         $.ajax "https://stagingapi.verbalizeit.com/tasks/#{job.id}/start?auth_token=#{verbalizeIt.dataContainer.authToken}",
           success: ->
-            $("#verbalizeit-caption-form").html("Success! Your request will be processed within 24 hours.")
+            $("#verbalizeit-caption-form").html(verbalizeIt.templates.submitted(job))
           type:
             'PUT'
+
+
+  bindUploadToggles: ->
+    $('input[name=caption-option]').change =>
+      @loginViewToggler.toggleUploadOptions()
 
   bindLoginButtons: ->
     $("#verbalizeit-signin").click =>
       @loginHandler.loginProcess()
+    $("#verbalizeit-create-account").click =>
+      @loginHandler.signupProcess()
+    $("#captions_listing").keypress (e)->
+      code = e.keyCode || e.which;
+      if code == 13 then e.preventDefault()
 
   initialize: ->
     @bindUploadToggles()
