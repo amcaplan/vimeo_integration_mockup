@@ -113,8 +113,6 @@ verbalizeIt =
             $("#verbalizeit-caption-form").html("Success! Your request will be processed within 24 hours.")
           type:
             'PUT'
-          contentType:
-            'application/json'
 
   bindLoginButtons: ->
     $("#verbalizeit-signin").click =>
