@@ -185,15 +185,15 @@ verbalizeIt =
     verbalizeItCaptionInput: ->
       $("#verbalizeit-caption-radio")
 
-    verbalizeItCaptionForm: ->
-      $("#verbalizeit-caption-form")
+    verbalizeItWrapper: ->
+      $("#verbalizeit-wrapper")
 
     toggleUploadOptions: ->
       if @uploadCaptionInput().is ":checked"
         @uploadCaptionForm().removeClass "hide"
-        @verbalizeItCaptionForm().addClass "hide"
+        @verbalizeItWrapper().addClass "hide"
       else if @verbalizeItCaptionInput().is ":checked"
-        @verbalizeItCaptionForm().removeClass "hide"
+        @verbalizeItWrapper().removeClass "hide"
         @uploadCaptionForm().addClass "hide"
 
   loginHandler:
