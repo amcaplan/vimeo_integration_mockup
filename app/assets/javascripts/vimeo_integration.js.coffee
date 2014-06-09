@@ -6,6 +6,7 @@
 verbalizeIt =
   dataContainer:
     languages: {}
+    videoID: $('link[rel=canonical]').attr('href').split('/')[1]
 
   templates:
     languageCodeToName: (code)->
@@ -27,6 +28,49 @@ verbalizeIt =
       langsArray = for languageCode, languageName of languages
         "<option value=\"#{languageCode}\">#{languageName}</option>"
       langsArray.join("\n")
+
+    login: (notice="", signupErrors={}, email="", password="")->
+      "<div id=\"captions_listing\" class=\"form_content\">
+            <h3>SIGN IN TO CONTINUE</h3>
+            <br>
+            <div class=\"row-fluid\">
+                <div class=\"span6\">
+                    <p>
+                        <label for=\"verbalizeit-email\">Email</label>
+                        <input class=\"input bg-light-grey appendb20\" id=\"verbalizeit-email\" size=\"30\" type=\"email\" value=\"#{email}\">
+                        #{if signupErrors.email
+                            "<div class=\"error_message\">
+                              Email #{signupErrors.email}
+                            </div>"
+                          else
+                            ""
+                        }
+                    </p>
+                    <br>
+                    <p class=\"psm\">
+                        <label for=\"verbalizeit-password\">Password</label>
+                        <input class=\"input bg-light-grey appendb0\" id=\"verbalizeit-password\" size=\"30\" type=\"password\" value=\"#{password}\">
+                        #{if signupErrors.password
+                            "<div class=\"error_message\">
+                              Password #{signupErrors.password}
+                            </div>"
+                          else
+                            ""
+                        }
+                    </p>
+                </div>
+                <br>
+            </div>
+
+            <div class=\"verbalizeit-login-buttons\">
+              <div class=\"btn verbalizeit-button signin-submit disabled\" id=\"verbalizeit-signin\">Sign in to VerbalizeIt</div>
+              <div class=\"btn verbalizeit-button signin-submit disabled\" id=\"verbalizeit-create-account\">Create a New Account</div>
+            </div>
+
+            <div id=\"verbalizeit-notice\" class=\"error_message\">
+              #{notice || ""}
+            </div>
+        </div>"
 
     languageChoice: ->
       "This video is in:
@@ -56,7 +100,7 @@ verbalizeIt =
         " Would you like to proceed? <div class=\"btn signin-submit\" " +
         "id=\"verbalizeit-submit-task\">Accept</div>"
 
-    dashboard: (notice=null)->
+    dashboard: (notice="")->
       tasks = verbalizeIt.dataContainer.tasks
 
       viewTemplate = $ "<div id=\"captions_listing\" class=\"form_content\">
@@ -77,7 +121,7 @@ verbalizeIt =
           <br>
 
           <div id=\"verbalizeit-notice\" class=\"error_message\">
-            #{notice || ""}
+            #{notice}
           </div>
       </div>"
 
@@ -97,7 +141,8 @@ verbalizeIt =
               </div>
               <div class=\"caption_col file\">
                 #{if task.status == "complete"
-                  "<a href=\"#\" class=\"verbalizeit-download-link\" data-task-id=\"#{task.id}\">Download File</a>"
+                  "<a href=\"#\" class=\"verbalizeit-download-link\" data-task-id=\"#{task.id}\"
+                    download=\"#{task.source_language}_to_#{task.target_language}.srt\">Download File</a>"
                 else
                   "<em>pending</em>"
               }
@@ -135,21 +180,35 @@ verbalizeIt =
       @getInfo(@signup)
 
     getInfo: (action)->
+      $(".verbalizeit-button").addClass("disabled")
+      $("#verbalizeit-caption-form").find(".error_message").text("")
       email = $("#verbalizeit-email").val()
       password = $("#verbalizeit-password").val()
-      action(email, password)
+      action(email, password).done (response)->
+        verbalizeIt.loginHandler.loggedIn(response)
+      .fail ->
+        $(".verbalizeit-button").addClass("disabled")
 
     login: (email, password)->
-      $.post "https://stagingapi.verbalizeit.com/api/customers/login",
-        {email: email, password: password}, (response)->
-          verbalizeIt.loginHandler.loggedIn(response)
+      $.post("https://stagingapi.verbalizeit.com/api/customers/login",
+        {email: email, password: password})
+      .fail (response, textStatus, errorThrown)->
+        errors = JSON.parse(response.responseText)
+        $("#verbalizeit-notice").text(errors.error)
 
     signup: (email, password)->
-      $.post "https://stagingapi.verbalizeit.com/api/customers/register",
-        {customer: {email: email, password: password}}, (response)->
-          verbalizeIt.loginHandler.loggedIn(response)
+      $.post("https://stagingapi.verbalizeit.com/api/customers/register",
+        {customer: {email: email, password: password}})
+      .fail (response, textStatus, errorThrown)->
+        errors = JSON.parse(response.responseText).errors
+        signupErrors =
+          email: if errors.email then errors.email[0] else ""
+          password: if errors.password then errors.password[0] else ""
+        $("#verbalizeit-caption-form").html verbalizeIt.templates.login(
+          "", signupErrors, email, password)
           
     loggedIn: (response)->
+      $(".verbalizeit-login-buttons").text("Loading Your Existing Tasks...")
       customer = response.customer
       verbalizeIt.dataContainer.authToken = customer.auth_token
       verbalizeIt.dashboardHandler.drawDashboard()
@@ -160,7 +219,7 @@ verbalizeIt =
         verbalizeIt.templates.dashboard(message)
       )
 
-    drawDashboard: (message=null)->
+    drawDashboard: (message=" ")->
       $.get "https://stagingapi.verbalizeit.com/tasks?auth_token=#{verbalizeIt.dataContainer.authToken}",
         (response)=>
           verbalizeIt.dataContainer.tasks = response
@@ -172,7 +231,7 @@ verbalizeIt =
         verbalizeIt.templates.languageChoice)
 
     handleTaskSubmission: (fromLanguageCode, toLanguageCode)->
-      videoID = $('link[rel=canonical]').attr('href').split('/')[1]
+      videoID = verbalizeIt.dataContainer.videoID
       $.post "https://stagingapi.verbalizeit.com/tasks/vimeo",
         {
           auth_token: verbalizeIt.dataContainer.authToken,
@@ -207,15 +266,21 @@ verbalizeIt =
 
   binders:
     uploadToggles: ->
-      $('input[name=caption-option]').change =>
+      $("#caption-options").on "change", "input[name=caption-option]", =>
         verbalizeIt.loginViewToggler.toggleUploadOptions()
 
     loginButtons: ->
-      $("#verbalizeit-signin").click =>
+      $("#verbalizeit-caption-form").on "click", "#verbalizeit-signin", =>
         verbalizeIt.loginHandler.loginProcess()
-      $("#verbalizeit-create-account").click =>
+      $("#verbalizeit-caption-form").on "keyup", ->
+        buttons = $(".verbalizeit-button")
+        if $("#verbalizeit-email").val() && $("#verbalizeit-password").val()
+          buttons.removeClass "disabled"
+        else
+          buttons.addClass "disabled"
+      $("#verbalizeit-caption-form").on "click", "#verbalizeit-create-account", =>
         verbalizeIt.loginHandler.signupProcess()
-      $("#captions_listing").keypress (e)->
+      $("#verbalizeit-caption-form").on "keypress", "#captions_listing", (e)->
         code = e.keyCode || e.which;
         if code == 13 then e.preventDefault()
 
@@ -256,6 +321,7 @@ verbalizeIt =
     $.each @binders, (index, binder)->
       binder()
     @getLanguages()
+    $("#verbalizeit-caption-form").html(verbalizeIt.templates.login)
 
 $(document).ready ->
   verbalizeIt.initialize()
