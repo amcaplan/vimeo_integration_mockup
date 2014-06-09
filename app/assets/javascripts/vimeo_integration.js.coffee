@@ -5,8 +5,8 @@
 
 verbalizeIt =
   dataContainer:
+    tasks: []
     languages: {}
-    videoID: $('link[rel=canonical]').attr('href').split('/')[1]
 
   templates:
     languageCodeToName: (code)->
@@ -31,8 +31,8 @@ verbalizeIt =
 
     login: (notice="", signupErrors={}, email="", password="")->
       "<div id=\"captions_listing\" class=\"form_content\">
-            <h3>SIGN IN TO CONTINUE</h3>
-            <br>
+            <h3>Sign in to Continue</h3>
+            <hr>
             <div class=\"row-fluid\">
                 <div class=\"span6\">
                     <p>
@@ -73,21 +73,32 @@ verbalizeIt =
         </div>"
 
     languageChoice: ->
-      "This video is in:
+      "<h3>STEP 1: Choose Languages</h3>
+      <hr>
+      What language is this video?
       <br>
-      <select id=\"verbalizeIt-choose-from-language\">" +
+      <select id=\"verbalizeit-choose-from-language\">" +
         verbalizeIt.templates.languagesAsOptions() +
       "</select>
       <br>
       <br>
-      Captions should be in:
-      <br>
-      <select id=\"verbalizeIt-choose-to-language\">" +
-        verbalizeIt.templates.languagesAsOptions() +
-      "</select>
-      <br>
-      <br>
-      <div class=\"btn signin-submit\" id=\"verbalizeit-choose-language\">Continue</div>"
+      <div id=\"verbalizeit-language-options\"></div>"
+    
+    translationOptions: (languageChoice)->
+      if languageChoice is "en"
+        template = "What language would you like captions in?
+        <br>
+        <select id=\"verbalizeit-choose-to-language\">" +
+          verbalizeIt.templates.languagesAsOptions() +
+        "</select>"
+      else
+        "Non-English languages can only be translated to English.
+        <select class=\"hide\" id=\"verbalizeit-choose-to-language\">
+          <option value=\"en\" selected></option>
+        </select>"
+
+      template + "<br><br>
+        <div class=\"btn signin-submit\" id=\"verbalizeit-choose-language\">Get Quote</div>"
 
     reviewOrder: (task)->
       if task.fromLanguage is task.toLanguage
@@ -96,34 +107,41 @@ verbalizeIt =
         action = "Translating this video from #{@languageCodeToName task.fromLanguage}" +
           " to #{@languageCodeToName task.toLanguage}"
 
-      action + " will cost $#{task.cost}. " +
-        " Would you like to proceed? <div class=\"btn signin-submit\" " +
-        "id=\"verbalizeit-submit-task\">Accept</div>"
+      "<h3>STEP 2: Confirm Order</h3>
+      <hr>
+      #{action} will cost $#{task.cost}. Would you like to proceed?
+      <br>
+      <br>
+      <div class=\"btn signin-submit\" id=\"verbalizeit-submit-task\">Accept</div>
+      <div class=\"btn signin-submit\" id=\"verbalizeit-reject-task\">Go Back</div>"
 
     dashboard: (notice="")->
       tasks = verbalizeIt.dataContainer.tasks
 
-      viewTemplate = $ "<div id=\"captions_listing\" class=\"form_content\">
+      viewTemplate = $ "
+          <div id=\"captions_listing\" class=\"form_content\">
+              <h3>Your Orders</h3>
+              <hr>
+          
+              <div class=\"caption_row header js-caption_list_header \">
+                  <div class=\"caption_col lang\">Languages</div>
+                  <div class=\"caption_col status\">Status</div>
+                  <div class=\"caption_col file\">Download Link</div>
+              </div>
 
-          <div class=\"caption_row header js-caption_list_header \">
-              <div class=\"caption_col lang\">Languages</div>
-              <div class=\"caption_col status\">Status</div>
-              <div class=\"caption_col file\">Download Link</div>
-          </div>
+              <div id=\"verbalizeit-tasks\" class=\"caption_row\">
+              </div>
 
-          <div id=\"verbalizeit-tasks\" class=\"caption_row\">
-          </div>
+              <br>
 
-          <br>
+              <div class=\"btn signin-submit\" id=\"verbalizeit-add-task\">Order a translation</div>
+              <div class=\"btn signin-submit\" id=\"verbalizeit-dashboard-refresh\">Refresh data</div>
+              <br>
 
-          <div class=\"btn signin-submit\" id=\"verbalizeit-add-task\">Order a translation</div>
-          <div class=\"btn signin-submit\" id=\"verbalizeit-dashboard-refresh\">Refresh data</div>
-          <br>
-
-          <div id=\"verbalizeit-notice\" class=\"error_message\">
-            #{notice}
-          </div>
-      </div>"
+              <div id=\"verbalizeit-notice\" class=\"error_message\">
+                #{notice}
+              </div>
+          </div>"
 
       if tasks.length is 0
         viewTemplate.find("#verbalizeit-tasks").append "
@@ -184,14 +202,13 @@ verbalizeIt =
       $("#verbalizeit-caption-form").find(".error_message").text("")
       email = $("#verbalizeit-email").val()
       password = $("#verbalizeit-password").val()
-      action(email, password).done (response)->
-        verbalizeIt.loginHandler.loggedIn(response)
-      .fail ->
-        $(".verbalizeit-button").addClass("disabled")
+      action(email, password)
 
     login: (email, password)->
       $.post("https://stagingapi.verbalizeit.com/api/customers/login",
         {email: email, password: password})
+      .done (response)->
+        verbalizeIt.loginHandler.loggedIn(response)
       .fail (response, textStatus, errorThrown)->
         errors = JSON.parse(response.responseText)
         $("#verbalizeit-notice").text(errors.error)
@@ -199,6 +216,8 @@ verbalizeIt =
     signup: (email, password)->
       $.post("https://stagingapi.verbalizeit.com/api/customers/register",
         {customer: {email: email, password: password}})
+      .done (response)->
+        verbalizeIt.loginHandler.loggedIn(response, withoutAjax: true)
       .fail (response, textStatus, errorThrown)->
         errors = JSON.parse(response.responseText).errors
         signupErrors =
@@ -207,11 +226,14 @@ verbalizeIt =
         $("#verbalizeit-caption-form").html verbalizeIt.templates.login(
           "", signupErrors, email, password)
           
-    loggedIn: (response)->
+    loggedIn: (response, options={})->
       $(".verbalizeit-login-buttons").text("Loading Your Existing Tasks...")
       customer = response.customer
       verbalizeIt.dataContainer.authToken = customer.auth_token
-      verbalizeIt.dashboardHandler.drawDashboard()
+      if options.withoutAjax
+        verbalizeIt.dashboardHandler.drawDashboardWithoutAjax()
+      else
+        verbalizeIt.dashboardHandler.drawDashboard()
 
   dashboardHandler:
     drawDashboardWithoutAjax: (message=null)->
@@ -229,6 +251,7 @@ verbalizeIt =
     displayLanguages: ->
       $("#verbalizeit-caption-form").html(
         verbalizeIt.templates.languageChoice)
+      $("#verbalizeit-choose-from-language").trigger("change")
 
     handleTaskSubmission: (fromLanguageCode, toLanguageCode)->
       videoID = verbalizeIt.dataContainer.videoID
@@ -291,12 +314,17 @@ verbalizeIt =
     refreshDashboardButton: ->
       $("#verbalizeit-caption-form").on "click", "#verbalizeit-dashboard-refresh", ->
         @.addClass("disabled")
-        verbalizeIt.dashboardHandler.drawDashboard()      
+        verbalizeIt.dashboardHandler.drawDashboard()
+
+    selectFromLanguage: ->
+      $("#verbalizeit-caption-form").on "change", "#verbalizeit-choose-from-language", ->
+        $("#verbalizeit-language-options").html(
+          verbalizeIt.templates.translationOptions $("#verbalizeit-choose-from-language").val())
 
     submitTaskButton: ->
       $("#verbalizeit-caption-form").on "click", "#verbalizeit-choose-language", ->
-        fromLanguageCode = $("#verbalizeIt-choose-from-language").val()
-        toLanguageCode = $("#verbalizeIt-choose-to-language").val()
+        fromLanguageCode = $("#verbalizeit-choose-from-language").val()
+        toLanguageCode = $("#verbalizeit-choose-to-language").val()
         verbalizeIt.languageHandler.handleTaskSubmission(
           fromLanguageCode, toLanguageCode)
 
@@ -321,6 +349,7 @@ verbalizeIt =
     $.each @binders, (index, binder)->
       binder()
     @getLanguages()
+    @dataContainer.videoID = $('link[rel=canonical]').attr('href').split('/')[1]
     $("#verbalizeit-caption-form").html(verbalizeIt.templates.login)
 
 $(document).ready ->
