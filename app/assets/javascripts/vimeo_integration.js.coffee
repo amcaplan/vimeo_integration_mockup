@@ -25,8 +25,7 @@ verbalizeIt =
     languagesAsOptions: ->
       languages = verbalizeIt.dataContainer.languages
       langsArray = for languageCode, languageName of languages
-        "<option value=\"#{languageCode}\" data-language-name=#{languageName}>" +
-          languageName + "</option>"
+        "<option value=\"#{languageCode}\">#{languageName}</option>"
       langsArray.join("\n")
 
     languageChoice: ->
@@ -48,9 +47,10 @@ verbalizeIt =
 
     reviewOrder: (task)->
       if task.fromLanguage is task.toLanguage
-        action = "Generating #{task.toLanguage} subtitles for this video"
+        action = "Generating #{@languageCodeToName task.toLanguage} subtitles for this video"
       else
-        action = "Translating this video from #{task.fromLanguage} to #{task.toLanguage}"
+        action = "Translating this video from #{@languageCodeToName task.fromLanguage}" +
+          " to #{@languageCodeToName task.toLanguage}"
 
       action + " will cost $#{task.cost}. " +
         " Would you like to proceed? <div class=\"btn signin-submit\" " +
@@ -155,20 +155,23 @@ verbalizeIt =
       verbalizeIt.dashboardHandler.drawDashboard()
 
   dashboardHandler:
+    drawDashboardWithoutAjax: (message=null)->
+      $("#verbalizeit-caption-form").html(
+        verbalizeIt.templates.dashboard(message)
+      )
+
     drawDashboard: (message=null)->
       $.get "https://stagingapi.verbalizeit.com/tasks?auth_token=#{verbalizeIt.dataContainer.authToken}",
         (response)=>
           verbalizeIt.dataContainer.tasks = response
-          $("#verbalizeit-caption-form").html(
-            verbalizeIt.templates.dashboard(message)
-          )
+          @drawDashboardWithoutAjax message
 
   languageHandler:
     displayLanguages: ->
       $("#verbalizeit-caption-form").html(
         verbalizeIt.templates.languageChoice)
 
-    handleTaskSubmission: (fromLanguageCode, toLanguageCode, fromLanguage, toLanguage)->
+    handleTaskSubmission: (fromLanguageCode, toLanguageCode)->
       videoID = $('link[rel=canonical]').attr('href').split('/')[1]
       $.post "https://stagingapi.verbalizeit.com/tasks/vimeo",
         {
@@ -177,12 +180,12 @@ verbalizeIt =
           source_language: fromLanguageCode,
           target_language: toLanguageCode
         }, (response)->
-          task = {
-            id: response.task_id,
-            cost: response.cost,
-            fromLanguage: fromLanguage,
-            toLanguage: toLanguage
-          }
+          task =
+            id: response.task_id
+            cost: response.cost
+            fromLanguage: fromLanguageCode
+            toLanguage: toLanguageCode
+          
           verbalizeIt.taskHandler.displayTask(task)
 
   taskHandler:
@@ -193,11 +196,14 @@ verbalizeIt =
       $("#verbalizeit-caption-form").off 'click.submitTask'
       $("#verbalizeit-caption-form").on 'click.submitTask', "#verbalizeit-submit-task", ->
         $.ajax "https://stagingapi.verbalizeit.com/tasks/#{task.id}/start?auth_token=#{verbalizeIt.dataContainer.authToken}",
-          success: ->
-            submitted = "Success! Your request will be processed within 24 hours."
-            verbalizeIt.dashboardHandler.drawDashboard(submitted)
           type:
             'PUT'
+          success: (submittedTask)->
+            submitted = "Success! Your request will be processed within 24 hours."
+            submittedTask.source_language = task.fromLanguage
+            submittedTask.target_language = task.toLanguage
+            verbalizeIt.dataContainer.tasks.push submittedTask
+            verbalizeIt.dashboardHandler.drawDashboardWithoutAjax(submitted)
 
   binders:
     uploadToggles: ->
@@ -225,17 +231,21 @@ verbalizeIt =
     submitTaskButton: ->
       $("#verbalizeit-caption-form").on "click", "#verbalizeit-choose-language", ->
         fromLanguageCode = $("#verbalizeIt-choose-from-language").val()
-        fromLanguage = $("option[value=#{fromLanguageCode}").data("language-name")
         toLanguageCode = $("#verbalizeIt-choose-to-language").val()
-        toLanguage = $("option[value=#{toLanguageCode}").data("language-name")
         verbalizeIt.languageHandler.handleTaskSubmission(
-          fromLanguageCode, toLanguageCode, fromLanguage, toLanguage)
+          fromLanguageCode, toLanguageCode)
 
     downloadFileLink: ->
-      $("#verbalizeit-caption-form").on "click", ".verbalizeit-download-link", ->
+      $("#verbalizeit-caption-form").on "click", ".verbalizeit-download-link", (e)->
+        e.preventDefault()
         taskID = $(@).data("task-id")
-        $.get "https://stagingapi.verbalizeit.com/tasks/#{taskID}?auth_token=#{verbalizeIt.dataContainer.authToken}", (response)->
-          window.open(response.completed_file, "_blank")
+        $.ajax
+          url: "https://stagingapi.verbalizeit.com/tasks/#{taskID}?auth_token=#{verbalizeIt.dataContainer.authToken}"
+          async: false
+          success:  (response)->
+            window.open(response.completed_file, "_blank")
+          error: ->
+            $("#verbalizeit-caption-form").find()
 
   getLanguages: ->
     $.get "https://stagingapi.verbalizeit.com/api/languages", (data)->
