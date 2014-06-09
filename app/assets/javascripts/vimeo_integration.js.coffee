@@ -85,8 +85,8 @@ verbalizeIt =
       <div id=\"verbalizeit-language-options\"></div>"
     
     translationOptions: (languageChoice)->
-      if languageChoice is "en"
-        template = "What language would you like captions in?
+      template = if languageChoice is "en"
+        "What language would you like captions in?
         <br>
         <select id=\"verbalizeit-choose-to-language\">" +
           verbalizeIt.templates.languagesAsOptions() +
@@ -202,7 +202,8 @@ verbalizeIt =
       $("#verbalizeit-caption-form").find(".error_message").text("")
       email = $("#verbalizeit-email").val()
       password = $("#verbalizeit-password").val()
-      action(email, password)
+      action(email, password).fail ->
+        $(".verbalizeit-button").removeClass("disabled")
 
     login: (email, password)->
       $.post("https://stagingapi.verbalizeit.com/api/customers/login",
@@ -327,6 +328,10 @@ verbalizeIt =
         toLanguageCode = $("#verbalizeit-choose-to-language").val()
         verbalizeIt.languageHandler.handleTaskSubmission(
           fromLanguageCode, toLanguageCode)
+
+    rejectTask: ->
+      $("#verbalizeit-caption-form").on "click.rejectTask", "#verbalizeit-reject-task", ->
+        verbalizeIt.languageHandler.displayLanguages()
 
     downloadFileLink: ->
       $("#verbalizeit-caption-form").on "click", ".verbalizeit-download-link", (e)->
