@@ -184,12 +184,12 @@ verbalizeIt =
       $("#verbalizeit-caption-form")
 
     toggleUploadOptions: ->
-      if @uploadCaptionInput().is(":checked")
-        @uploadCaptionForm().removeClass("hide")
-        @verbalizeItCaptionForm().addClass("hide")
-      else if @verbalizeItCaptionInput().is(":checked")
-        @verbalizeItCaptionForm().removeClass("hide")
-        @uploadCaptionForm().addClass("hide")
+      if @uploadCaptionInput().is ":checked"
+        @uploadCaptionForm().removeClass "hide"
+        @verbalizeItCaptionForm().addClass "hide"
+      else if @verbalizeItCaptionInput().is ":checked"
+        @verbalizeItCaptionForm().removeClass "hide"
+        @uploadCaptionForm().addClass "hide"
 
   loginHandler:
     loginProcess: ->
@@ -199,12 +199,12 @@ verbalizeIt =
       @getInfo(@signup)
 
     getInfo: (action)->
-      $(".verbalizeit-button").addClass("disabled")
+      $(".verbalizeit-button").addClass "disabled"
       $("#verbalizeit-caption-form").find(".error_message").text("")
       email = $("#verbalizeit-email").val()
       password = $("#verbalizeit-password").val()
       action(email, password).fail ->
-        $(".verbalizeit-button").removeClass("disabled")
+        $(".verbalizeit-button").removeClass "disabled"
 
     login: (email, password)->
       $.post("https://stagingapi.verbalizeit.com/api/customers/login",
@@ -279,6 +279,7 @@ verbalizeIt =
       
       $("#verbalizeit-caption-form").off 'click.submitTask'
       $("#verbalizeit-caption-form").on 'click.submitTask', "#verbalizeit-submit-task", ->
+        $("#verbalizeit-submit-task").addClass "disabled"
         $.ajax "https://stagingapi.verbalizeit.com/tasks/#{task.id}/start?auth_token=#{verbalizeIt.dataContainer.authToken}",
           type:
             'PUT'
@@ -315,7 +316,7 @@ verbalizeIt =
 
     refreshDashboardButton: ->
       $("#verbalizeit-caption-form").on "click", "#verbalizeit-dashboard-refresh", ->
-        @.addClass("disabled")
+        @.addClass "disabled"
         verbalizeIt.dashboardHandler.drawDashboard()
 
     displayDashboardButton: ->
@@ -329,6 +330,7 @@ verbalizeIt =
 
     submitTaskButton: ->
       $("#verbalizeit-caption-form").on "click", "#verbalizeit-choose-language", ->
+        $("#verbalizeit-choose-language").addClass "disabled"
         fromLanguageCode = $("#verbalizeit-choose-from-language").val()
         toLanguageCode = $("#verbalizeit-choose-to-language").val()
         verbalizeIt.languageHandler.handleTaskSubmission(
