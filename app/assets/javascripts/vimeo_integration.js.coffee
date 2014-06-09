@@ -36,6 +36,11 @@ verbalizeIt =
             <div class=\"row-fluid\">
                 <div class=\"span6\">
                     <p>
+                      New to VerbalizeIt?<br>
+                      Fill in your email and a password, and click the button
+                      to create a new account!
+                    </p>
+                    <p>
                         <label for=\"verbalizeit-email\">Email</label>
                         <input class=\"input bg-light-grey appendb20\" id=\"verbalizeit-email\" size=\"30\" type=\"email\" value=\"#{email}\">
                         #{if signupErrors.email
