@@ -98,7 +98,8 @@ verbalizeIt =
         </select>"
 
       template + "<br><br>
-        <div class=\"btn signin-submit\" id=\"verbalizeit-choose-language\">Get Quote</div>"
+        <div class=\"btn signin-submit\" id=\"verbalizeit-choose-language\">Get Quote</div>
+        <div class=\"btn signin-submit\" id=\"verbalizeit-display-dashboard\">Return to Dashboard</div>"
 
     reviewOrder: (task)->
       if task.fromLanguage is task.toLanguage
@@ -316,6 +317,10 @@ verbalizeIt =
       $("#verbalizeit-caption-form").on "click", "#verbalizeit-dashboard-refresh", ->
         @.addClass("disabled")
         verbalizeIt.dashboardHandler.drawDashboard()
+
+    displayDashboardButton: ->
+      $("#verbalizeit-caption-form").on "click", "#verbalizeit-display-dashboard", ->
+        verbalizeIt.dashboardHandler.drawDashboardWithoutAjax()        
 
     selectFromLanguage: ->
       $("#verbalizeit-caption-form").on "change", "#verbalizeit-choose-from-language", ->
