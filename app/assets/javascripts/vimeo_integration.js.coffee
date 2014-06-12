@@ -115,7 +115,7 @@ verbalizeIt =
 
       "<h3>STEP 2: Confirm Order</h3>
       <hr>
-      #{action} will cost $#{task.cost}. Would you like to proceed?
+      #{action} will cost $#{task.cost.toFixed(2)}. Would you like to proceed?
       <br>
       <br>
       <div class=\"btn signin-submit\" id=\"verbalizeit-submit-task\">Accept</div>
